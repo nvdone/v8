@@ -14,23 +14,20 @@
 
 #include "v8.hpp"
 
-int V8::autoWrap(int autoType, VARIANT *pvRes, IDispatch *piIDispatch, LPOLESTR name, int cArgs...)
+int V8::autoWrap(IDispatch *piIDispatch, int autoType, LPOLESTR name, VARIANT *pvRes, int cArgs...)
 {
 	va_list marker;
 	va_start(marker, cArgs);
 
+	DISPPARAMS dispParams = { NULL, NULL, 0, 0 };
+	DISPID dispIdNamed = DISPID_PROPERTYPUT;
+	DISPID dispId;
+	VARIANT* pArgs;
+
 	if (!piIDispatch)
 		return 1;
 
-	DISPPARAMS dispParams = {NULL, NULL, 0, 0};
-	DISPID dispIdNamed = DISPID_PROPERTYPUT;
-	DISPID dispId;
-
-	HRESULT hr;
-	VARIANT *pArgs;
-
-	hr = piIDispatch->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_SYSTEM_DEFAULT, &dispId);
-	if (FAILED(hr))
+	if (FAILED(piIDispatch->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_SYSTEM_DEFAULT, &dispId)))
 		return 2;
 
 	pArgs = new VARIANT[cArgs + 1];
@@ -49,13 +46,12 @@ int V8::autoWrap(int autoType, VARIANT *pvRes, IDispatch *piIDispatch, LPOLESTR 
 		dispParams.rgdispidNamedArgs = &dispIdNamed;
 	}
 
-	hr = piIDispatch->Invoke(dispId, IID_NULL, LOCALE_SYSTEM_DEFAULT, autoType, &dispParams, pvRes, NULL, NULL);
-	if (FAILED(hr))
+	if (FAILED(piIDispatch->Invoke(dispId, IID_NULL, LOCALE_SYSTEM_DEFAULT, autoType, &dispParams, pvRes, NULL, NULL)))
 		return 3;
 
-	va_end(marker);
-
 	delete[] pArgs;
+
+	va_end(marker);
 
 	return 0;
 }
@@ -78,12 +74,10 @@ int V8::Initialize(wchar_t *progId)
 {
 	CLSID clsid;
 
-	HRESULT hr = CLSIDFromProgID(progId, &clsid);
-	if (FAILED(hr))
+	if (FAILED(CLSIDFromProgID(progId, &clsid)))
 		return 110;
 
-	hr = CoCreateInstance(clsid, NULL, CLSCTX_INPROC_SERVER, IID_IDispatch, (void **)&piV8);
-	if (FAILED(hr))
+	if (FAILED(CoCreateInstance(clsid, NULL, CLSCTX_INPROC_SERVER, IID_IDispatch, (void**)&piV8)))
 	{
 		return 120;
 	}
@@ -103,7 +97,7 @@ int V8::Connect(wchar_t *connectionString)
 	vStr.bstrVal = ::SysAllocStringLen(connectionString, wcslen(connectionString));
 
 	VariantInit(&vRes);
-	res = autoWrap(DISPATCH_METHOD, &vRes, piV8, L"Connect", 1, vStr);
+	res = autoWrap(piV8, DISPATCH_METHOD, L"Connect", &vRes, 1);
 
 	VariantClear(&vStr);
 
@@ -127,7 +121,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 	IDispatch *pUser = NULL;
 
 	VariantInit(&vRes);
-	res = autoWrap(DISPATCH_PROPERTYGET, &vRes, piCon, L"ПользователиИнформационнойБазы", 0);
+	res = autoWrap(piCon, DISPATCH_PROPERTYGET, L"ПользователиИнформационнойБазы", &vRes, 0);
 	if (res)
 		return 300 + res;
 
@@ -138,7 +132,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 	vStr.bstrVal = ::SysAllocStringLen(user, wcslen(user));
 
 	VariantInit(&vRes);
-	res = autoWrap(DISPATCH_METHOD, &vRes, pUsers, L"НайтиПоИмени", 1, vStr);
+	res = autoWrap(pUsers, DISPATCH_METHOD, L"НайтиПоИмени", &vRes, 1);
 
 	VariantClear(&vStr);
 
@@ -161,7 +155,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 	{
 		vBool.boolVal = enable1cauth;
 
-		res = autoWrap(DISPATCH_PROPERTYPUT, NULL, pUser, L"АутентификацияСтандартная", 1, vBool);
+		res = autoWrap(pUser, DISPATCH_PROPERTYPUT, L"АутентификацияСтандартная", NULL, 1);
 		if (res)
 		{
 			if (pUser)
@@ -176,7 +170,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 		vStr.vt = VT_BSTR;
 		vStr.bstrVal = ::SysAllocStringLen(pass, wcslen(pass));
 
-		res = autoWrap(DISPATCH_PROPERTYPUT, NULL, pUser, L"Пароль", 1, vStr);
+		res = autoWrap(pUser, DISPATCH_PROPERTYPUT, L"Пароль", NULL, 1);
 
 		VariantClear(&vStr);
 
@@ -192,7 +186,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 	{
 		vBool.boolVal = lockpassword;
 
-		res = autoWrap(DISPATCH_PROPERTYPUT, NULL, pUser, L"ЗапрещеноИзменятьПароль", 1, vBool);
+		res = autoWrap(pUser, DISPATCH_PROPERTYPUT, L"ЗапрещеноИзменятьПароль", NULL, 1);
 		if (res)
 		{
 			if (pUser)
@@ -205,7 +199,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 	{
 		vBool.boolVal = setvisible;
 
-		res = autoWrap(DISPATCH_PROPERTYPUT, NULL, pUser, L"ПоказыватьВСпискеВыбора", 1, vBool);
+		res = autoWrap(pUser, DISPATCH_PROPERTYPUT, L"ПоказыватьВСпискеВыбора", NULL, 1);
 		if (res)
 		{
 			if (pUser)
@@ -218,7 +212,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 	{
 		vBool.boolVal = enabledomainauth;
 
-		res = autoWrap(DISPATCH_PROPERTYPUT, NULL, pUser, L"АутентификацияОС", 1, vBool);
+		res = autoWrap(pUser, DISPATCH_PROPERTYPUT, L"АутентификацияОС", NULL, 1);
 		if (res)
 		{
 			if (pUser)
@@ -233,7 +227,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 		vStr.vt = VT_BSTR;
 		vStr.bstrVal = ::SysAllocStringLen(domainaccount, wcslen(domainaccount));
 
-		res = autoWrap(DISPATCH_PROPERTYPUT, NULL, pUser, L"ПользовательОС", 1, vStr);
+		res = autoWrap(pUser, DISPATCH_PROPERTYPUT, L"ПользовательОС", NULL, 1);
 
 		VariantClear(&vStr);
 
@@ -250,7 +244,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 		vBool.boolVal = warnunsafe;
 
 		VariantInit(&vRes);
-		res = autoWrap(DISPATCH_PROPERTYGET, &vRes, pUser, L"ЗащитаОтОпасныхДействий", 0);
+		res = autoWrap(pUser, DISPATCH_PROPERTYGET, L"ЗащитаОтОпасныхДействий", &vRes, 0);
 		if (res)
 		{
 			if (pUser)
@@ -260,7 +254,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 		
 		IDispatch *pProt = vRes.pdispVal;
 
-		res = autoWrap(DISPATCH_PROPERTYPUT, NULL, pProt, L"ПредупреждатьОбОпасныхДействиях", 1, vBool);
+		res = autoWrap(pProt, DISPATCH_PROPERTYPUT, L"ПредупреждатьОбОпасныхДействиях", NULL, 1);
 
 		if (pProt)
 			pProt->Release();
@@ -273,7 +267,7 @@ int V8::EditUser(wchar_t *user, int enable1cauth, wchar_t *pass, int lockpasswor
 		}
 	}
 
-	res = autoWrap(DISPATCH_METHOD, NULL, pUser, L"Записать", 0);
+	res = autoWrap(pUser, DISPATCH_METHOD, L"Записать", NULL, 0);
 	if (res)
 	{
 		if (pUser)
@@ -310,7 +304,7 @@ int V8::CancelTask(wchar_t *name, int log)
 	
 	VariantInit(&vStruct);
 
-	res = autoWrap(DISPATCH_METHOD, &vStruct, piCon, L"NewObject", 1, vStr1);
+	res = autoWrap(piCon, DISPATCH_METHOD, L"NewObject", &vStruct, 1);
 	if (res)
 		return 500 + res;
 
@@ -326,7 +320,7 @@ int V8::CancelTask(wchar_t *name, int log)
 	vStr2.vt = VT_BSTR;
 	vStr2.bstrVal = ::SysAllocStringLen(L"Наименование", wcslen(L"Наименование"));
 
-	res = autoWrap(DISPATCH_METHOD, NULL, pStruct, L"Вставить", 2, vStr1, vStr2); // value - key!
+	res = autoWrap(pStruct, DISPATCH_METHOD, L"Вставить", NULL, 2); // value - key!
 
 	VariantClear(&vStr2);
 	VariantClear(&vStr1);
@@ -339,7 +333,7 @@ int V8::CancelTask(wchar_t *name, int log)
 	}
 	
 	VariantInit(&vRes);
-	res = autoWrap(DISPATCH_PROPERTYGET, &vRes, piCon, L"СостояниеФоновогоЗадания", 0);
+	res = autoWrap(piCon, DISPATCH_PROPERTYGET, L"СостояниеФоновогоЗадания", &vRes, 0);
 	if (res)
 	{
 		if(pStruct)
@@ -350,7 +344,7 @@ int V8::CancelTask(wchar_t *name, int log)
 	pTaskStates = vRes.pdispVal;
 
 	VariantInit(&vTaskState);
-	res = autoWrap(DISPATCH_PROPERTYGET, &vTaskState, pTaskStates, L"Активно", 0);
+	res = autoWrap(pTaskStates, DISPATCH_PROPERTYGET, L"Активно", &vTaskState, 0);
 
 	if(pTaskStates)
 		pTaskStates->Release();
@@ -366,7 +360,7 @@ int V8::CancelTask(wchar_t *name, int log)
 	vStr1.vt = VT_BSTR;
 	vStr1.bstrVal = ::SysAllocStringLen(L"Состояние", wcslen(L"Состояние"));
 
-	res = autoWrap(DISPATCH_METHOD, NULL, pStruct, L"Вставить", 2, vTaskState, vStr1); // value - key!
+	res = autoWrap(pStruct, DISPATCH_METHOD, L"Вставить", NULL, 2); // value - key!
 
 	VariantClear(&vStr1);
 	VariantClear(&vTaskState);
@@ -379,7 +373,7 @@ int V8::CancelTask(wchar_t *name, int log)
 	}
 
 	VariantInit(&vRes);
-	res = autoWrap(DISPATCH_PROPERTYGET, &vRes, piCon, L"ФоновыеЗадания", 0);
+	res = autoWrap(piCon, DISPATCH_PROPERTYGET, L"ФоновыеЗадания", &vRes, 0);
 	if (res)
 	{
 		if(pStruct)
@@ -390,7 +384,7 @@ int V8::CancelTask(wchar_t *name, int log)
 	pBackTasks = vRes.pdispVal;
 	
 	VariantInit(&vRes);
-	res = autoWrap(DISPATCH_METHOD, &vRes, pBackTasks, L"ПолучитьФоновыеЗадания", 1, vStruct);
+	res = autoWrap(pBackTasks, DISPATCH_METHOD, L"ПолучитьФоновыеЗадания", &vRes, 1);
 
 	if(pBackTasks)
 		pBackTasks->Release();
@@ -406,7 +400,7 @@ int V8::CancelTask(wchar_t *name, int log)
 	pTasks = vRes.pdispVal;
 	
 	VariantInit(&vCount);
-	res = autoWrap(DISPATCH_METHOD, &vCount, pTasks, L"Количество", 0);
+	res = autoWrap(pTasks, DISPATCH_METHOD, L"Количество", &vCount, 0);
 	if (res)
 	{
 		if(pTasks)
@@ -424,11 +418,11 @@ int V8::CancelTask(wchar_t *name, int log)
 		vCount.iVal = i;
 		
 		VariantInit(&vRes);
-		res = autoWrap(DISPATCH_METHOD, &vRes, pTasks, L"Получить", 1, vCount);
+		res = autoWrap(pTasks, DISPATCH_METHOD, L"Получить", &vRes, 1);
 		if (!res)
 		{
 			pTask = vRes.pdispVal;
-			autoWrap(DISPATCH_METHOD, NULL, pTask, L"Отменить", 0);
+			autoWrap(pTask, DISPATCH_METHOD, L"Отменить", NULL, 0);
 		
 			if(pTask)
 				pTask->Release();
@@ -449,7 +443,7 @@ int V8::Execute(wchar_t *code)
 	vStr.vt = VT_BSTR;
 	vStr.bstrVal = buf;
 
-	int res = autoWrap(DISPATCH_METHOD, NULL, piCon, L"Exec1C", 1, vStr);
+	int res = autoWrap(piCon, DISPATCH_METHOD, L"Exec1C", NULL, 1);
 
 	VariantClear(&vStr);
 
